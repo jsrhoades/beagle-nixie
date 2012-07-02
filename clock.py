@@ -144,11 +144,11 @@ def main():
     try:
         while (1):
             str = strftime(" %H%M%S ".ljust(8))
-            str = str[::-1]
-
             if not last_display == str:
                 last_display = str
                 print str
+
+            str = str[::-1]
             write_string(str)
 
     except KeyboardInterrupt, e:
