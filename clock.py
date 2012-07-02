@@ -39,9 +39,6 @@ except ImportError, e:
     print >>sys.stderr, "No pybbio module found. Aborting."
     sys.exit(1)
 
-### Delay -> 10 microseconds ###
-MSEC = 10
-
 ### GPIO Lines ###
 
 LINES = {
