@@ -31,7 +31,7 @@ import datetime
 import atexit
 
 import sys
-from time import sleep, strftime
+from time import strftime
 
 try:
     from bbio import *
