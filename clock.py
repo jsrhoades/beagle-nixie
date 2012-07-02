@@ -79,8 +79,8 @@ SEGMENT_VALUES = {
     "8":    BUILD_SEGMENT("ABCDEFG"),
     "9":    BUILD_SEGMENT("ABCDFG"),
     "0":    BUILD_SEGMENT("ABCDEF"),
-    " ":    BUILD_SEGMENT(""),
-    ".":    BUILD_SEGMENT("G"),
+    "X":    BUILD_SEGMENT(""),
+    ".":    BUILD_SEGMENT("H"),
 }
 
 
@@ -100,27 +100,21 @@ DIGITS = {
 
 def blank():
     digitalWrite(LINES["BLANK"], 1)
-    
-    delayMicroseconds(MSEC)
     digitalWrite(LINES["BLANK"], 0)
 
 
 def write_bit(value):
-    delayMicroseconds(MSEC)
     digitalWrite(LINES["CLK"], 1)
-
-    delayMicroseconds(MSEC)
     digitalWrite(LINES["DIN"], int(value))
-
-    delayMicroseconds(MSEC)
     digitalWrite(LINES["CLK"], 0)
 
 
 def write_byte(byte, digit):
-    blank()
-
     value = DIGITS[str(digit + 1)]
     value |= SEGMENT_VALUES[byte]
+
+    if digit % 2:
+        value |= SEGMENTS["SEG_H"]
 
     value = bin(value)[2:]
     value = value.rjust(20, '0')
@@ -128,16 +122,14 @@ def write_byte(byte, digit):
     for i in value:
         write_bit(i)
 
-    delayMicroseconds(MSEC)
     digitalWrite(LINES["LOAD"], 1)
-
-    delayMicroseconds(MSEC)
     digitalWrite(LINES["LOAD"], 0)
 
 def write_string(data):
     idx = 0
     for byte in data:
-        write_byte(byte, idx)
+        if not byte.isspace():
+            write_byte(byte, idx)
         idx += 1
 
 def setup_gpios():
@@ -151,15 +143,18 @@ def main():
 
     try:
         while (1):
-            str = strftime("%H %M %S")
+            str = strftime(" %H%M%S ".ljust(8))
+            str = str[::-1]
+
             if not last_display == str:
                 last_display = str
                 print str
-
-            write_string(str[::-1])
+            write_string(str)
 
     except KeyboardInterrupt, e:
-            write_string("".rjust(8))
+            str = "".rjust(9)
+            str = str.replace(" ", "X")
+            write_string(str)
 
 
 if __name__ == '__main__':
