@@ -35,6 +35,7 @@ from time import strftime
 
 try:
     from bbio import *
+    from bbio.bbio import _setReg, _pinMux
 except ImportError, e:
     print >>sys.stderr, "No pybbio module found. Aborting."
     sys.exit(1)
@@ -137,11 +138,45 @@ def setup_gpios():
         pinMode(value, OUTPUT)
         digitalWrite(value, 0)
 
+### No feedback loop. So know what you are doing... ###
+SYSFS_PWM = "/sys/class/pwm/ehrpwm.1:0/"
+
+def setup_pwm():
+    _setReg(CM_PER_EPWMSS1_CLKCTRL, 0x2)
+    _pinMux("gpmc_a2", 6)
+
+    with open(SYSFS_PWM + "duty_percent", "w") as f:
+        f.write("0")
+
+    with open(SYSFS_PWM + "run", "w") as f:
+        f.write("0")
+
+    ### 32 Khz ###
+    with open(SYSFS_PWM + "period_freq", "w") as f:
+        f.write("32000")
+
+    with open(SYSFS_PWM + "duty_percent", "w") as f:
+        f.write("5")
+
+    with open(SYSFS_PWM + "run", "w") as f:
+        f.write("1")
+
+
+def shutdown_pwm():
+    with open(SYSFS_PWM + "run", "w") as f:
+        f.write("0")
+
+
 def main():
     setup_gpios()
-    atexit.register(blank)
+    setup_pwm()
 
+    atexit.register(blank)
+    atexit.register(shutdown_pwm)
+
+    unblank()
     last_display = ""
+
     try:
         while (1):
             str = strftime(" %H%M%S ".ljust(8))
@@ -151,9 +186,7 @@ def main():
 
             str = str[::-1]
             write_string(str)
-    except KeyboardInterrupt, e:
-        pass
-
+    except KeyboardInterrupt: pass
 
 if __name__ == '__main__':
     main()
