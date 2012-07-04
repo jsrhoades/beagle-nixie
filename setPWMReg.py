@@ -1,13 +1,11 @@
 #! /usr/bin/python
 # Enable PWM Timer on Beaglebone
+
+from bbio.config import *
+
 from mmap import mmap
 import struct
-MMAP_OFFSET = 0x44c00000                # base address of registers
-MMAP_SIZE   = 0x48ffffff-MMAP_OFFSET    # size of the register memory space
-CM_PER_BASE = 0x44e00000 - MMAP_OFFSET
-CM_PER_EPWMSS1_CLKCTRL = CM_PER_BASE + 0xcc
-CM_PER_EPWMSS0_CLKCTRL = CM_PER_BASE + 0xd4
-CM_PER_EPWMSS2_CLKCTRL = CM_PER_BASE + 0xd8
+
 with open("/dev/mem", "r+b") as f:
     mem = mmap(f.fileno(), MMAP_SIZE, offset=MMAP_OFFSET)
 def _andReg(address, mask):
