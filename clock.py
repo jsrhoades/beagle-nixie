@@ -76,7 +76,6 @@ SEGMENT_VALUES = {
     "8":    BUILD_SEGMENT("ABCDEFG"),
     "9":    BUILD_SEGMENT("ABCDFG"),
     "0":    BUILD_SEGMENT("ABCDEF"),
-    "X":    BUILD_SEGMENT(""),
     ".":    BUILD_SEGMENT("H"),
 }
 
@@ -95,8 +94,12 @@ DIGITS = {
 
 ### GPIO Functions ###
 
+### Blank is mostly useless unless you want use a power save mode ### 
+
 def blank():
     digitalWrite(LINES["BLANK"], 1)
+
+def unblank():
     digitalWrite(LINES["BLANK"], 0)
 
 
@@ -136,8 +139,9 @@ def setup_gpios():
 
 def main():
     setup_gpios()
-    last_display = ""
+    atexit.register(blank)
 
+    last_display = ""
     try:
         while (1):
             str = strftime(" %H%M%S ".ljust(8))
@@ -147,11 +151,8 @@ def main():
 
             str = str[::-1]
             write_string(str)
-
     except KeyboardInterrupt, e:
-            str = "".rjust(9)
-            str = str.replace(" ", "X")
-            write_string(str)
+        pass
 
 
 if __name__ == '__main__':
