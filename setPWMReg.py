@@ -8,15 +8,7 @@ import struct
 
 with open("/dev/mem", "r+b") as f:
     mem = mmap(f.fileno(), MMAP_SIZE, offset=MMAP_OFFSET)
-def _andReg(address, mask):
-    """ Sets 32-bit Register at address to its current value AND mask. """
-    _setReg(address, _getReg(address)&mask)
-def _orReg(address, mask):
-    """ Sets 32-bit Register at address to its current value OR mask. """
-    _setReg(address, _getReg(address)|mask)
-def _xorReg(address, mask):
-    """ Sets 32-bit Register at address to its current value XOR mask. """
-    _setReg(address, _getReg(address)^mask)
+
 def _getReg(address):
     """ Returns unpacked 32 bit register value starting from address. """
     return struct.unpack("<L", mem[address:address+4])[0]
