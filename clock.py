@@ -148,8 +148,11 @@ def setup_pwm():
     with open(SYSFS_PWM + "duty_percent", "w") as f:
         f.write("0")
 
-    with open(SYSFS_PWM + "run", "w") as f:
-        f.write("0")
+    try:
+        with open(SYSFS_PWM + "run", "w") as f:
+            f.write("0")
+    except IOError, e:
+        pass
 
     ### 32 Khz ###
     with open(SYSFS_PWM + "period_freq", "w") as f:
