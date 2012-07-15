@@ -43,7 +43,7 @@ except ImportError, e:
 ### GPIO Lines ###
 
 LINES = {
-    "BLANK": GPIO1_31,
+    "BLANK": GPIO2_7,
     "CLK": GPIO1_1,
     "DIN": GPIO1_29,
     "LOAD": GPIO1_5,
