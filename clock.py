@@ -123,8 +123,9 @@ def write_byte(byte, digit):
     for i in value:
         write_bit(i)
 
-    digitalWrite(LINES["LOAD"], 1)
+    ### SPI active low ###
     digitalWrite(LINES["LOAD"], 0)
+    digitalWrite(LINES["LOAD"], 1)
 
 def write_string(data):
     idx = 0
