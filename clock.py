@@ -34,6 +34,14 @@ import sys
 from time import strftime
 
 try:
+    from spi import spi_transfer, SPIDev
+    SPI_DEVICE = "/dev/spidev2.0"
+except ImportError, e:
+    print >>sys.stderr, "No spi module found. Aborting."
+    sys.exit(1)
+
+
+try:
     from bbio import *
     from bbio.bbio import _setReg, _pinMux
 except ImportError, e:
@@ -44,20 +52,17 @@ except ImportError, e:
 
 LINES = {
     "BLANK": GPIO2_7,
-    "CLK": GPIO1_1,
-    "DIN": GPIO1_29,
-    "LOAD": GPIO1_5,
 }
 
 SEGMENTS = {
-    "SEG_A": 1 << 10,
-    "SEG_B": 1 << 19,
-    "SEG_C": 1 << 13,
-    "SEG_D": 1 << 12,
-    "SEG_E": 1 << 14,
-    "SEG_F": 1 << 20,
-    "SEG_G": 1 << 18,
-    "SEG_H": 1 << 11,
+    "SEG_A": 1 << 9,
+    "SEG_B": 1 << 18,
+    "SEG_C": 1 << 12,
+    "SEG_D": 1 << 11,
+    "SEG_E": 1 << 13,
+    "SEG_F": 1 << 19,
+    "SEG_G": 1 << 17,
+    "SEG_H": 1 << 10,
 }
 
 def BUILD_SEGMENT(segments):
@@ -82,14 +87,14 @@ SEGMENT_VALUES = {
 
 
 DIGITS = {
-    "1": 1 << 8,
-    "2": 1 << 1,
-    "3": 1 << 7,
-    "4": 1 << 2,
-    "5": 1 << 6, 
-    "6": 1 << 3,
-    "7": 1 << 4, 
-    "8": 1 << 5,
+    "1": 1 << 7,
+    "2": 1 << 0,
+    "3": 1 << 6,
+    "4": 1 << 1,
+    "5": 1 << 5, 
+    "6": 1 << 2,
+    "7": 1 << 3, 
+    "8": 1 << 4,
     "9": 1 << 8,
 }
 
@@ -103,13 +108,6 @@ def blank():
 def unblank():
     digitalWrite(LINES["BLANK"], 0)
 
-
-def write_bit(value):
-    digitalWrite(LINES["CLK"], 1)
-    digitalWrite(LINES["DIN"], int(value))
-    digitalWrite(LINES["CLK"], 0)
-
-
 def write_byte(byte, digit):
     value = DIGITS[str(digit + 1)]
     value |= SEGMENT_VALUES[byte]
@@ -117,22 +115,27 @@ def write_byte(byte, digit):
     if digit % 2:
         value |= SEGMENTS["SEG_H"]
 
-    value = bin(value)[2:]
-    value = value.rjust(20, '0')
+    data = []
+    data.append(chr((value >> 16) & 0xff))
+    data.append(chr((value >> 8) & 0xff))
+    data.append(chr(value & 0xff))
 
-    for i in value:
-        write_bit(i)
+    transaction = []
+    transfer, tx_buf, rx_buf = spi_transfer("".join(data), readlen=0)
+    transaction.append(transfer)
 
-    ### SPI active low ###
-    digitalWrite(LINES["LOAD"], 0)
-    digitalWrite(LINES["LOAD"], 1)
+    dev = SPIDev(SPI_DEVICE) 
+    dev.do_transfers(transaction)
 
 def write_string(data):
     idx = 0
+
+    unblank()
     for byte in data:
         if not byte.isspace():
             write_byte(byte, idx)
         idx += 1
+    blank()
 
 def setup_gpios():
     for key, value in LINES.items():
@@ -182,14 +185,18 @@ def main():
     last_display = ""
 
     try:
+        x = 0
         while (1):
             str = strftime(" %H%M%S ".ljust(8))
             if not last_display == str:
                 last_display = str
-                print str
+                print str, x
+                x = 0
 
             str = str[::-1]
             write_string(str)
+
+            x += 1
     except KeyboardInterrupt: pass
 
 if __name__ == '__main__':
