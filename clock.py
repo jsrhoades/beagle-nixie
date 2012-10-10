@@ -50,6 +50,10 @@ except ImportError, e:
 
 ### GPIO Lines ###
 
+LINES = {
+    "BLANK": GPIO2_7,
+}
+
 SEGMENTS = {
     "SEG_A": 1 << 9,
     "SEG_B": 1 << 18,
@@ -96,6 +100,14 @@ DIGITS = {
 
 ### GPIO Functions ###
 
+### Blank is mostly useless unless you want use a power save mode ### 
+
+def blank():
+    digitalWrite(LINES["BLANK"], 1)
+
+def unblank():
+    digitalWrite(LINES["BLANK"], 0)
+
 def write_byte(byte, digit):
     value = DIGITS[str(digit + 1)]
     value |= SEGMENT_VALUES[byte]
@@ -124,6 +136,11 @@ def write_string(data):
             write_byte(byte, idx)
         idx += 1
     blank()
+
+def setup_gpios():
+    for key, value in LINES.items():
+        pinMode(value, OUTPUT)
+        digitalWrite(value, 0)
 
 ### No feedback loop. So know what you are doing... ###
 SYSFS_PWM = "/sys/class/pwm/ehrpwm.1:0/"
@@ -158,6 +175,7 @@ def shutdown_pwm():
 
 
 def main():
+    setup_gpios()
     setup_pwm()
 
     atexit.register(blank)
