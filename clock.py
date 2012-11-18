@@ -98,15 +98,27 @@ DIGITS = {
     "9": 1 << 8,
 }
 
-### GPIO Functions ###
+BLANKING_PWM = "/sys/class/pwm/ehrpwm.1:1/"
 
-### Blank is mostly useless unless you want use a power save mode ### 
+def set_brightness(value):
+    value = 100 - value
 
-def blank():
-    digitalWrite(LINES["BLANK"], 1)
+    _pinMux("gpmc_a3", 6) # Blanking PWM Channel #
 
-def unblank():
-    digitalWrite(LINES["BLANK"], 0)
+    with open(BLANKING_PWM + "duty_percent", "w") as f:
+        f.write(str(value))
+
+    try:
+        with open(BLANKING_PWM + "run", "w") as f:
+            f.write("1")
+    except IOError, e:
+        pass
+
+def blank_screen():
+    set_brightness(0)
+
+    with open(BLANKING_PWM + "run", "w") as f:
+        f.write("0")
 
 def write_byte(byte, digit):
     value = DIGITS[str(digit + 1)]
@@ -130,12 +142,10 @@ def write_byte(byte, digit):
 def write_string(data):
     idx = 0
 
-    unblank()
     for byte in data:
         if not byte.isspace():
             write_byte(byte, idx)
         idx += 1
-    blank()
 
 def setup_gpios():
     for key, value in LINES.items():
@@ -147,7 +157,7 @@ SYSFS_PWM = "/sys/class/pwm/ehrpwm.1:0/"
 
 def setup_pwm():
     _setReg(CM_PER_EPWMSS1_CLKCTRL, 0x2)
-    _pinMux("gpmc_a2", 6)
+    _pinMux("gpmc_a2", 6) # Boost PWM Channel #
 
     with open(SYSFS_PWM + "duty_percent", "w") as f:
         f.write("0")
@@ -173,17 +183,31 @@ def shutdown_pwm():
     with open(SYSFS_PWM + "run", "w") as f:
         f.write("0")
 
-
 def main():
     setup_gpios()
     setup_pwm()
 
-    atexit.register(blank)
+    if len(sys.argv) == 2:
+        brightness = sys.argv[1]
+        if brightness.isdigit():
+            brightness = int(brightness)
+
+            if not brightness in range(1, 100 + 1):
+                print "Defaulting brightness to 50"
+                brightness = 50
+        else:
+            print "Defaulting brightness to 50"
+            brightness = 50
+    else:
+        print "Defaulting brightness to 50"
+        brightness = 50
+
+    set_brightness(brightness)
+
+    atexit.register(blank_screen)
     atexit.register(shutdown_pwm)
 
-    unblank()
     last_display = ""
-
     try:
         x = 0
         while (1):
