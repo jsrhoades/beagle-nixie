@@ -117,6 +117,8 @@ def set_brightness(value):
 def blank_screen():
     set_brightness(0)
 
+    write_byte(".", 0) # Discharge boost converter here #
+
     with open(BLANKING_PWM + "run", "w") as f:
         f.write("0")
 
