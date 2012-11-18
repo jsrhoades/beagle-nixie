@@ -204,8 +204,8 @@ def main():
 
     set_brightness(brightness)
 
-    atexit.register(blank_screen)
     atexit.register(shutdown_pwm)
+    atexit.register(blank_screen)
 
     last_display = ""
     try:
