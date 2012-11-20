@@ -48,12 +48,6 @@ except ImportError, e:
     print >>sys.stderr, "No pybbio module found. Aborting."
     sys.exit(1)
 
-### GPIO Lines ###
-
-LINES = {
-    "BLANK": GPIO2_7,
-}
-
 SEGMENTS = {
     "SEG_A": 1 << 9,
     "SEG_B": 1 << 18,
