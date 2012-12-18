@@ -11,7 +11,7 @@
 // r10 - digit #9
 // r11 - run status
 // r12 - counter
-// r13- data out
+// r13 - data out
 // r29 - return pointer
 // r30 - GPO PRU0
 // r31 - HOST-to-PRU INTC 
