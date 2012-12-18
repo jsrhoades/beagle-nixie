@@ -5,7 +5,7 @@ CFLAGS = -I/usr/local/include -DDEBUG
 LDFLAGS = -L/usr/local/lib -lprussdrv -lpthread
 PASM = pasm
 
-DATA_PRU = pru0_data.bin
+DATA_PRU = pru0_clock.bin
 LDR = clock
 
 all: $(LDR) $(LATCH_PRU) $(DATA_PRU)

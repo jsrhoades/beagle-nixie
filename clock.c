@@ -253,7 +253,7 @@ int main(void) {
 		return -ENOMEM;
 	}
 	pru.prumem[RUN_FLAG_IDX] = 1; /* startup */
-	prussdrv_exec_program(0, "./pru0_data.bin");
+	prussdrv_exec_program(0, "./pru0_clock.bin");
 
 	blank_vfd(&pru);
 	signal(SIGINT, shutdown_clock);
