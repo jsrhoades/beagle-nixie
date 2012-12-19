@@ -156,7 +156,7 @@ quit:
         mov r31.b0, PRU0_ARM_INTERRUPT + 16
         halt
 
-        // run MAX6921 chip at 4mhz
+        // run MAX6921 chip at ~5mhz
 write_digit:
         // 20-bit shift register count
         mov r12, 20
@@ -164,11 +164,11 @@ data:
         // check to see right most bit state
         and r13, r1, 1
         or r13, r13, CLOCK_BIT
-        WRITE_DATA 5
+        WRITE_DATA 10
         
         // clock
         mov r13, 0
-        WRITE_DATA 5
+        WRITE_DATA 10
 
         lsr r1, r1, 1
         sub r12, r12, 1
@@ -176,5 +176,5 @@ data:
 latch:
         // latch
         mov r13, LATCH_BIT
-        WRITE_DATA 5
+        WRITE_DATA 10
         ret
