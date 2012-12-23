@@ -1,5 +1,5 @@
 /*
- * Nixie Cape PRU Clock Application
+ * Nixie Cape PRU Application
  *
  * Copyright 2012, Matt Ranostay. All rights reserved.
  *
