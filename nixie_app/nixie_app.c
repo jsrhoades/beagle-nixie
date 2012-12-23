@@ -31,12 +31,19 @@
 #include <errno.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 #include <signal.h>
-#include <time.h>
+#include <unistd.h>
 
 #include <prussdrv.h>
 #include <pruss_intc_mapping.h>
+#include <sys/fcntl.h>
+#include <sys/stat.h>
+#include <time.h>
+
+#define FIFO_FILE	"/dev/nixie"
+#define msecs(i)	(i * 1000)
 
 /*
  * Segments
@@ -204,19 +211,6 @@ leave:
 	return 0;
 }
 
-static void update_time(char *buf, int len) {
-	time_t lt;
-	struct tm *ptr;
-
-	lt = time(NULL);
-	ptr = localtime(&lt);
-
-	strftime(buf, len, " %H.%M.%S ", ptr);
-#ifdef DEBUG
-	printf("Time is NOW: %s\n", buf);
-#endif
-}
-
 static void trigger_update(struct pru_data *pru)
 {
 	prussdrv_pru_send_event(ARM_PRU0_INTERRUPT);
@@ -235,10 +229,17 @@ static void shutdown_clock(int signo)
 }
 
 
-int main(void) {
+int main(int argc, char **argv) {
 	char buf[32];
+	char *bin_path, *ptr;
 	struct pru_data	pru;
+	int fd;
 
+#ifndef DEBUG
+	if (fork() != 0) {
+		return 0;
+	}
+#endif
 	tpruss_intc_initdata pruss_intc_initdata = PRUSS_INTC_INITDATA;
 	prussdrv_init();
 	if (prussdrv_open(PRU_EVTOUT_0)) {
@@ -252,19 +253,38 @@ int main(void) {
 		fprintf(stderr, "Cannot map PRU0 memory buffer.\n");
 		return -ENOMEM;
 	}
+
+
+	/* Create the FIFO if it does not exist */
+	umask(0);
+	mknod(FIFO_FILE, S_IFIFO|0666, 0);
+
+	fd = open(FIFO_FILE, O_RDONLY);
+	if (fd < 0) {
+		fprintf(stderr, "Cannot open FIFO.\n");
+		return -EINVAL;
+	}
+
 	pru.prumem[RUN_FLAG_IDX] = 1; /* startup */
-	prussdrv_exec_program(0, "./pru0_clock.bin");
+	bin_path = strdup(argv[0]);
+
+	ptr = strrchr(bin_path, '/');
+	*ptr = '\0';
+
+	chdir(bin_path);
+	prussdrv_exec_program(0, "pru0_nixie.bin");
 
 	blank_vfd(&pru);
 	signal(SIGINT, shutdown_clock);
 
-	int i = 0;
-	while (running) {
-		update_time((char *) &buf, sizeof(buf));
-		update_buffer((const char *) &buf, &pru);
-		trigger_update(&pru);
-		sleep(1);
+	while (running) {	
+		if (read(fd, buf, sizeof(buf) - 1) > 0) {
+			update_buffer((const char *) &buf, &pru);
+			trigger_update(&pru);
+		}
+		usleep(msecs(10));
 	}
+	close(fd);
 
 	pru.prumem[RUN_FLAG_IDX] = 0;
 	trigger_update(&pru);
@@ -276,5 +296,10 @@ int main(void) {
 
 	prussdrv_pru_disable(0);
 	prussdrv_exit();
+
+	if (bin_path) {
+		free(bin_path);
+	}
+
 	return 0;
 }

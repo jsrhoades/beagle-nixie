@@ -1,12 +1,13 @@
 CROSS_COMPILE ?= arm-angstrom-linux-gnueabi-
 
 CC = $(CROSS_COMPILE)gcc
-CFLAGS = -I/usr/local/include -DDEBUG
+#CFLAGS = -I/usr/local/include -DDEBUG
+CFLAGS = -I/usr/local/include
 LDFLAGS = -L/usr/local/lib -lprussdrv -lpthread
 PASM = pasm
 
-DATA_PRU = pru0_clock.bin
-LDR = clock
+DATA_PRU = pru0_nixie.bin
+LDR = nixie_app
 
 all: $(LDR) $(LATCH_PRU) $(DATA_PRU)
 

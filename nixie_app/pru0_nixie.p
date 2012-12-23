@@ -24,7 +24,7 @@
 #define LATCH_BIT          1<<1
 
 #define CONST_PRUCFG       c4
-#define CONST_PRUDRAM      c24
+#define CONST_PRUSRAM      c24
 
 #define CONST_PRUSSINTC    c0
 #define SICR_OFFSET        0x24
@@ -99,7 +99,7 @@ update_buffer:
         sbco r0, CONST_PRUSSINTC, SICR_OFFSET, 4 
 
         // copy over buffer
-        lbco VFD_DIGIT1, CONST_PRUDRAM, 0, VFD_BUFFER_SIZE + 4
+        lbco VFD_DIGIT1, CONST_PRUSRAM, 0, VFD_BUFFER_SIZE + 4
         qbbc quit, RUN_STATUS
 
         // clear everything
