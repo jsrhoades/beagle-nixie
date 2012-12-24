@@ -93,7 +93,7 @@ start:
         sbco r0, CONST_PRUCFG, 4, 4
 
 update_buffer:
-        // clear intterupt
+        // clear interrupt
         ldi r0.w2, 0
         ldi r0.w0, ARM_PRU0_INTERRUPT
         sbco r0, CONST_PRUSSINTC, SICR_OFFSET, 4 
