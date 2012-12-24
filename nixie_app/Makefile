@@ -9,7 +9,7 @@ PASM = pasm
 DATA_PRU = pru0_nixie.bin
 LDR = nixie_app
 
-all: $(LDR) $(LATCH_PRU) $(DATA_PRU)
+all: $(LDR) $(DATA_PRU)
 
 $(LDR): $(basename $(LDR)).c
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
