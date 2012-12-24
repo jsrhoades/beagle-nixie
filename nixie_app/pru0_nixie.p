@@ -12,7 +12,7 @@
 // r11 - run status
 // r12 - counter
 // r13 - data out
-// r29 - return pointer
+// r27 - return pointer
 // r30 - GPO PRU0
 // r31 - HOST-to-PRU INTC 
 
@@ -52,7 +52,7 @@
 .entrypoint start
 
 .macro PULSE
-        mov     r30, r13
+        mov     GPO_PRU0_REG, r13
 .endm
 
 // 10 clock cycle delay

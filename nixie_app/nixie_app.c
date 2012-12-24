@@ -276,6 +276,7 @@ int main(int argc, char **argv) {
 
 	blank_vfd(&pru);
 	signal(SIGINT, shutdown_clock);
+	signal(SIGTERM, shutdown_clock);
 
 	while (running) {	
 		if (read(fd, buf, sizeof(buf) - 1) > 0) {
