@@ -1,0 +1,139 @@
+From ad435bc72317a9b294b8f7e2ca6c21dbf0269000 Mon Sep 17 00:00:00 2001
+From: Matt Ranostay <mranostay@gmail.com>
+Date: Mon, 26 Nov 2012 23:04:52 -0800
+Subject: [PATCH 1/2] capebus: Add nixie cape device tree entry
+
+Added nixie capebus PWM, leds, and spi-vfd definitions to am355x-bone-common
+
+Signed-off-by: Matt Ranostay <mranostay@gmail.com>
+---
+ arch/arm/boot/dts/am335x-bone-common.dtsi |   78 +++++++++++++++++++++++++++++
+ 1 file changed, 78 insertions(+)
+
+diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
+index 5bb6a1c..55542b2 100644
+--- a/arch/arm/boot/dts/am335x-bone-common.dtsi
++++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
+@@ -40,6 +40,13 @@
+ 				0x19c 0x13	/* mcasp0_ahclkr.spi1_cs0, OUTPUT_PULLUP | MODE3 */
+ 			>;
+ 		};
++		pruss_pins: pinmux_pruss_pins {
++			pinctrl-single,pins = <
++				0x190 0x05	/* mcasp0_aclkx.pr1_pru0_pru_r30_0, MODE5 | DATA */
++				0x194 0x05	/* mcasp0_fsx.pr1_pru0_pru_r30_1, MODE5 | LATCH */
++				0x1a4 0x05	/* mcasp0_fsr.pr1_pru1_pru_r30_5, MODE5 | CLK */
++			>;
++		};
+ 		lcd_pins: pinmux_lcd_pins {
+ 			pinctrl-single,pins = <
+ 				0x1a4 0x17	/* mcasp0_fsr.gpio3_19, OUTPUT_PULLUP | MODE7 */
+@@ -160,6 +167,19 @@
+ 			>;
+ 		};
+ 
++		bone_nixie_cape_led_pins: pinmux_bone_nixie_cape_led_pins {
++			pinctrl-single,pins = <
++				0x1ac 0x07	/* mcasp0_ahclkx.gpio3_21, MODE7 */
++			>;
++		};
++
++		bone_nixie_cape_pins: pinmux_bone_nixie_cape_pins {
++			pinctrl-single,pins = <
++				0x48 0x06	/* gpmc_a2.ehrpwm1a, OMAP_MUX_MODE6 | AM33XX_PIN_OUTPUT */
++				0x4c 0x06	/* gpmc_a3.ehrpwm1b, OMAP_MUX_MODE6 | AM33XX_PIN_OUTPUT */
++			>;
++	        };
++
+ 		bone_geiger_cape_pins: pinmux_bone_geiger_cape_pins {
+ 			pinctrl-single,pins = <
+ 				0x48 0x06       /* gpmc_a2.ehrpwm1a, OMAP_MUX_MODE6 | AM33XX_PIN_OUTPUT */
+@@ -305,6 +325,10 @@
+ 				compatible = "bone-generic-cape";
+ 			};
+ 
++			bone_nixie_cape: cape@7 {
++				compatible = "bone-nixie-cape";
++			};
++
+ 			/* overrides; no EEPROM (prototyping) */
+ //			override@3 {
+ //				compatible = "bone-capebus-slot-override";
+@@ -324,6 +348,17 @@
+ //				/* TODO: Add the rest */
+ //			};
+ 
++			/* overrides; no EEPROM (prototyping) */
++//			override@1 {
++//				compatible = "bone-capebus-slot-override";
++//				slot = <1>;
++//				board-name = "Nixie Cape";
++//				version = "00A0";
++//				manufacturer = "Ranostay Industries";
++//				/* TODO; Add the rest */
++//			};
++
++			/* overrides; no EEPROM (prototyping) */
+ //			override@1 {
+ //				compatible = "bone-capebus-slot-override";
+ //				slot = <1>;
+@@ -449,6 +484,11 @@
+ 	pinctrl-0 = <&spi1_pins>;
+ };
+ 
++&pruss {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pruss_pins>;
++};
++
+ &edma {
+ 	ti,edma-xbar-event-map = <32 12>;
+ };
+@@ -547,6 +587,44 @@
+ 	};
+ };
+ 
++&bone_nixie_cape {
++	board-name = "Nixie Cape";
++
++	/* note that these can't be versioned.... */
++	pinctrl-names = "default";
++	pinctrl-0 = <&bone_nixie_cape_pins>;
++
++	pwms = <&ehrpwm1 0 500000 0>;
++	pwm-names = "bone-nixie-cape";
++
++	pwm-frequency  = <9250>;	/* 9.250KHz */
++	pwm-duty-cycle = <35>;		/* 35% */
++
++	default-brightness = <35>;	/* 35% */
++
++	gpio-leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&bone_nixie_cape_led_pins>;
++
++		nixie-led0 {
++			label = "nixie:green:usr0";
++			gpios = <&gpio4 21 0>;
++			linux,default-trigger = "nixie-run";
++			default-state = "off";
++		};
++	};
++
++	pruss-devices {
++		compatible = "pruss-dt";
++
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		parent = <&pruss>;
++	};
++};
++
+ &bone_geiger_cape {
+ 	board-name = "Geiger Cape";
+ 
+-- 
+1.7.9.5
+

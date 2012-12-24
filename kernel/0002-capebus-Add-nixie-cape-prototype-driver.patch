@@ -1,0 +1,474 @@
+From 5677e1e98c0bbc4984e196343ff33cb60a6a598d Mon Sep 17 00:00:00 2001
+From: Matt Ranostay <mranostay@gmail.com>
+Date: Mon, 26 Nov 2012 23:13:22 -0800
+Subject: [PATCH 2/2] capebus: Add nixie cape prototype driver
+
+Add support for nixie cape breadboard prototype.
+
+Signed-off-by: Matt Ranostay <mranostay@gmail.com>
+---
+ drivers/capebus/capes/Kconfig           |    8 +
+ drivers/capebus/capes/Makefile          |    1 +
+ drivers/capebus/capes/bone-nixie-cape.c |  426 +++++++++++++++++++++++++++++++
+ 3 files changed, 435 insertions(+)
+ create mode 100644 drivers/capebus/capes/bone-nixie-cape.c
+
+diff --git a/drivers/capebus/capes/Kconfig b/drivers/capebus/capes/Kconfig
+index 0418bef..0c129f8 100644
+--- a/drivers/capebus/capes/Kconfig
++++ b/drivers/capebus/capes/Kconfig
+@@ -11,3 +11,11 @@ config CAPEBUS_BONE_GEIGER
+ 	default n
+ 	help
+ 	  "Select this to enable a driver for the geiger cape"
++
++config CAPEBUS_BONE_NIXIE
++	tristate "Beaglebone Nixie cape driver"
++	depends on CAPEBUS_BONE_CONTROLLER
++	select CAPEBUS_SPI_VFD
++	default n
++	help
++	  "Select this to enable a driver for the nixie cape"
+diff --git a/drivers/capebus/capes/Makefile b/drivers/capebus/capes/Makefile
+index d6f94ce..3d6666e 100644
+--- a/drivers/capebus/capes/Makefile
++++ b/drivers/capebus/capes/Makefile
+@@ -1,2 +1,3 @@
+ obj-$(CONFIG_CAPEBUS_BONE_GENERIC)	+= bone-generic-cape.o
+ obj-$(CONFIG_CAPEBUS_BONE_GEIGER)	+= bone-geiger-cape.o
++obj-$(CONFIG_CAPEBUS_BONE_NIXIE)	+= bone-nixie-cape.o
+diff --git a/drivers/capebus/capes/bone-nixie-cape.c b/drivers/capebus/capes/bone-nixie-cape.c
+new file mode 100644
+index 0000000..e4d7ba6
+--- /dev/null
++++ b/drivers/capebus/capes/bone-nixie-cape.c
+@@ -0,0 +1,426 @@
++/*
++ * Nixie cape driver
++ *
++ *  Copyright (C) 2012 Matt Ranostay <mranostay@gmail.com>
++ *
++ * Based on original work by
++ *  Copyright (C) 2012 Pantelis Antoniou <panto@antoniou-consulting.com>
++ *  Copyright (C) 2012 Texas Instruments Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
++ */
++
++#include <linux/module.h>
++#include <linux/kernel.h>
++#include <linux/string.h>
++#include <linux/timer.h>
++#include <linux/errno.h>
++#include <linux/init.h>
++#include <linux/delay.h>
++#include <linux/bitops.h>
++#include <linux/err.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/pinctrl/pinctrl.h>
++#include <linux/pinctrl/pinmux.h>
++#include <linux/pinctrl/consumer.h>
++#include <asm/barrier.h>
++#include <plat/clock.h>
++#include <plat/omap_device.h>
++#include <linux/pwm.h>
++#include <plat/omap_device.h>
++#include <linux/leds.h>
++
++#include <linux/capebus/capebus-bone.h>
++
++extern struct cape_driver bonenixie_driver;
++
++enum {
++	BLANK_PWM_CHAN	= 0,
++	BOOST_PWM_CHAN	= 1,
++};
++
++struct bone_nixie_info {
++	struct cape_dev *dev;
++	struct bone_capebus_generic_info *geninfo;
++	struct pwm_device *pwm_dev;
++	struct led_trigger *run_led;		/* running */
++
++	int pwm_frequency;
++	int pwm_duty_cycle;
++	int pwm_period;
++	int brightness;
++	int run;
++};
++
++static const struct of_device_id bonenixie_of_match[] = {
++	{
++		.compatible = "bone-nixie-cape",
++	},
++	{ },
++};
++MODULE_DEVICE_TABLE(of, bonenixie_of_match);
++
++/*
++ * XXX: PWM subsystem doesn't allow easily selecting multiple channels on
++ *	the same chip... so we hack it.. this shouldn't be here long term
++ */
++
++static void nixie_pwm_config(struct bone_nixie_info *info,
++			     int duty, int chan)
++{
++	struct pwm_device *pwm = info->pwm_dev;
++
++	duty = (info->pwm_period * duty) / 100;
++
++	pwm->hwpwm = chan;
++	pwm_config(pwm, duty, info->pwm_period);
++
++	pwm->chip->ops->enable(pwm->chip, pwm);
++}
++
++static void nixie_pwm_disable(struct pwm_device *pwm, int chan)
++{
++	pwm->hwpwm = chan;
++	pwm->chip->ops->disable(pwm->chip, pwm);
++}
++
++static int bonenixie_start(struct cape_dev *dev)
++{
++	struct bone_nixie_info *info = dev->drv_priv;
++	int duty;
++
++	if (info->run != 0)
++		return 0;
++
++	/* checks */
++	if (info->pwm_frequency < 1000 || info->pwm_frequency > 50000) {
++		dev_err(&dev->dev, "Cowardly refusing to use a "
++				"frequency of %d\n",
++				info->pwm_frequency);
++		return -EINVAL;
++	}
++	if (info->pwm_duty_cycle > 80) {
++		dev_err(&dev->dev, "Cowardly refusing to use a "
++				"duty cycle of %d\n",
++				info->pwm_duty_cycle);
++		return -EINVAL;
++	}
++
++	info->pwm_period = div_u64(1000000000LLU, info->pwm_frequency);
++	duty = (info->pwm_period * info->pwm_duty_cycle) / 100;
++
++	dev_info(&dev->dev, "starting nixie tube with "
++			" boost converter duty=%duns period=%dus"
++			" default brightness percent=%d\n",
++			duty, info->pwm_period, info->brightness);
++
++	nixie_pwm_config(info, 100 - info->brightness, BLANK_PWM_CHAN);
++	nixie_pwm_config(info, info->pwm_duty_cycle, BOOST_PWM_CHAN);
++
++	info->run = 1;
++	led_trigger_event(info->run_led, LED_FULL);
++
++	return 0;
++}
++
++static int bonenixie_stop(struct cape_dev *dev)
++{
++	struct bone_nixie_info *info = dev->drv_priv;
++
++	if (info->run == 0)
++		return 0;
++
++	dev_info(&dev->dev, "disabling nixie tube\n");
++
++	nixie_pwm_config(info, 0, BLANK_PWM_CHAN);	/* 0% duty cycle */
++	nixie_pwm_disable(info->pwm_dev, BLANK_PWM_CHAN);
++
++	nixie_pwm_config(info, 0, BOOST_PWM_CHAN);	/* 0% duty cycle */
++	nixie_pwm_disable(info->pwm_dev, BOOST_PWM_CHAN);
++
++	info->run = 0;
++	led_trigger_event(info->run_led, LED_OFF);
++
++	return 0;
++}
++
++static ssize_t bonenixie_show_brightness(struct device *dev,
++				struct device_attribute *attr, char *buf)
++{
++	struct cape_dev *cdev = to_cape_dev(dev);
++	struct bone_nixie_info *info = cdev->drv_priv;
++
++	return sprintf(buf, "%d\n", info->brightness);
++}
++
++
++static ssize_t bonenixie_store_brightness(struct device *dev,
++				struct device_attribute *attr,
++				const char *buf, size_t count)
++{
++	struct cape_dev *cdev = to_cape_dev(dev);
++	struct bone_nixie_info *info = cdev->drv_priv;
++	int brightness;
++
++	if (sscanf(buf, "%d", &brightness) != 1)
++		return -EINVAL;
++
++	if (brightness < 0 || brightness > 100)
++		return -EINVAL;
++
++	info->brightness = brightness;
++	nixie_pwm_config(info, 100 - brightness, BLANK_PWM_CHAN);
++
++	return count;
++}
++
++
++static ssize_t bonenixie_show_run(struct device *dev,
++				struct device_attribute *attr, char *buf)
++{
++	struct cape_dev *cdev = to_cape_dev(dev);
++	struct bone_nixie_info *info = cdev->drv_priv;
++
++	return sprintf(buf, "%d\n", info->run);
++}
++
++
++static ssize_t bonenixie_store_run(struct device *dev,
++				struct device_attribute *attr,
++				const char *buf, size_t count)
++{
++	struct cape_dev *cdev = to_cape_dev(dev);
++	int run, err;
++
++	if (sscanf(buf, "%i", &run) != 1)
++		return -EINVAL;
++
++	if (run)
++		err = bonenixie_start(cdev);
++	else
++		err = bonenixie_stop(cdev);
++
++	return err ? err : count;
++}
++
++static DEVICE_ATTR(brightness, S_IRUGO | S_IWUSR,
++		bonenixie_show_brightness, bonenixie_store_brightness);
++
++static DEVICE_ATTR(run, S_IRUGO | S_IWUSR,
++		bonenixie_show_run, bonenixie_store_run);
++
++static int bonenixie_sysfs_register(struct cape_dev *cdev)
++{
++	int err;
++
++	err = device_create_file(&cdev->dev, &dev_attr_run);
++	if (err != 0)
++		goto err_no_run;
++
++	err = device_create_file(&cdev->dev, &dev_attr_brightness);
++	if (err != 0)
++		goto err_no_brightness;
++
++	return 0;
++
++err_no_brightness:
++	device_remove_file(&cdev->dev, &dev_attr_run);
++err_no_run:
++	return err;
++}
++
++static void bonenixie_sysfs_unregister(struct cape_dev *cdev)
++{
++	device_remove_file(&cdev->dev, &dev_attr_brightness);
++	device_remove_file(&cdev->dev, &dev_attr_run);
++}
++
++static int bonenixie_probe(struct cape_dev *dev, const struct cape_device_id *id)
++{
++	char boardbuf[33];
++	char versionbuf[5];
++	const char *board_name;
++	const char *version;
++	struct bone_nixie_info *info;
++	struct pinctrl *pinctrl;
++	struct device_node *node, *pwm_node;
++	phandle phandle;
++	u32 val;
++	int err;
++
++	/* boiler plate probing */
++	err = bone_capebus_probe_prolog(dev, id);
++	if (err != 0)
++		return err;
++
++	/* get the board name (after check of cntrlboard match) */
++	board_name = bone_capebus_id_get_field(id, BONE_CAPEBUS_BOARD_NAME,
++			boardbuf, sizeof(boardbuf));
++	/* get the board version */
++	version = bone_capebus_id_get_field(id, BONE_CAPEBUS_VERSION,
++			versionbuf, sizeof(versionbuf));
++	/* should never happen; but check anyway */
++	if (board_name == NULL || version == NULL)
++		return -ENODEV;
++
++	dev->drv_priv = devm_kzalloc(&dev->dev, sizeof(*info), GFP_KERNEL);
++	if (dev->drv_priv == NULL) {
++		dev_err(&dev->dev, "Failed to allocate info\n");
++		err = -ENOMEM;
++		goto err_no_mem;
++	}
++	info = dev->drv_priv;
++
++	pinctrl = devm_pinctrl_get_select_default(&dev->dev);
++	if (IS_ERR(pinctrl))
++		dev_warn(&dev->dev,
++			"pins are not configured from the driver\n");
++
++	node = capebus_of_find_property_node(dev, "version", version, "pwms");
++	if (node == NULL) {
++		dev_err(&dev->dev, "unable to find pwms property\n");
++		err = -ENODEV;
++		goto err_no_pwm;
++	}
++
++	err = of_property_read_u32(node, "pwms", &val);
++	if (err != 0) {
++		dev_err(&dev->dev, "unable to read pwm handle\n");
++		goto err_no_pwm;
++	}
++	phandle = val;
++
++	pwm_node = of_find_node_by_phandle(phandle);
++	if (pwm_node == NULL) {
++		dev_err(&dev->dev, "Failed to pwm node\n");
++		err = -EINVAL;
++		goto err_no_pwm;
++	}
++
++	err = capebus_of_platform_device_enable(pwm_node);
++	of_node_put(pwm_node);
++	if (err != 0) {
++		dev_err(&dev->dev, "Failed to pwm node\n");
++		goto err_no_pwm;
++	}
++
++	info->pwm_dev = of_pwm_request(node, NULL);
++	of_node_put(node);
++	if (IS_ERR(info->pwm_dev)) {
++		dev_err(&dev->dev, "unable to request PWM\n");
++		err = PTR_ERR(info->pwm_dev);
++		goto err_no_pwm;
++	}
++
++	if (capebus_of_property_read_u32(dev,
++				"version", version,
++				"pwm-frequency", &val) != 0) {
++		val = 9250;
++		dev_warn(&dev->dev, "Could not read pwm-frequency property; "
++				"using default %u\n",
++				val);
++	}
++	info->pwm_frequency = val;
++
++	if (capebus_of_property_read_u32(dev,
++				"version", version,
++				"pwm-duty-cycle", &val) != 0) {
++		val = 35;
++		dev_warn(&dev->dev, "Could not read pwm-duty-cycle property; "
++				"using default %u\n",
++				val);
++	}
++	info->pwm_duty_cycle = val;
++
++	if (capebus_of_property_read_u32(dev,
++				"version", version,
++				"default-brightness", &val) != 0) {
++		val = 80;
++		dev_warn(&dev->dev, "Could not read default-brightness property; "
++				"using default %u\n",
++				val);
++	}
++	info->brightness = val;
++
++	err = bonenixie_sysfs_register(dev);
++	if (err != 0) {
++		dev_err(&dev->dev, "unable to register sysfs\n");
++		goto err_no_sysfs;
++	}
++
++	led_trigger_register_simple("nixie-run", &info->run_led);
++
++	/* pick up the generics; spi and leds */
++	info->geninfo = bone_capebus_probe_generic(dev, id);
++	if (info->geninfo == NULL) {
++		dev_err(&dev->dev, "Could not probe generic\n");
++		goto err_no_generic;
++	}
++
++	led_trigger_event(info->run_led, LED_OFF);
++
++	dev_info(&dev->dev, "ready\n");
++
++	err = bonenixie_start(dev);
++	if (err != 0) {
++		dev_err(&dev->dev, "Could not start nixie device\n");
++		goto err_no_start;
++	}
++
++	return 0;
++
++err_no_start:
++	led_trigger_unregister_simple(info->run_led);
++	bone_capebus_remove_generic(info->geninfo);
++err_no_generic:
++	bonenixie_sysfs_unregister(dev);
++err_no_sysfs:
++err_no_pwm:
++	devm_kfree(&dev->dev, info);
++err_no_mem:
++	return err;
++}
++
++static void bonenixie_remove(struct cape_dev *dev)
++{
++	struct bone_nixie_info *info = dev->drv_priv;
++
++	dev_info(&dev->dev, "Remove nixie cape driver...\n");
++
++	bonenixie_stop(dev);
++
++	bone_capebus_remove_generic(info->geninfo);
++	led_trigger_unregister_simple(info->run_led);
++	bonenixie_sysfs_unregister(dev);
++}
++
++struct cape_driver bonenixie_driver = {
++	.driver = {
++		.name		= "bonenixie",
++		.owner		= THIS_MODULE,
++		.of_match_table = bonenixie_of_match,
++	},
++	.probe		= bonenixie_probe,
++	.remove		= bonenixie_remove,
++};
++
++module_capebus_driver(bonenixie_driver);
++
++
++MODULE_AUTHOR("Matt Ranostay");
++MODULE_DESCRIPTION("Beaglebone nixie cape");
++MODULE_LICENSE("GPL");
++MODULE_ALIAS("platform:bone-nixie-cape");
+-- 
+1.7.9.5
+
