@@ -260,9 +260,9 @@ update_vfd:
 
         // loop forever
         jmp interrupt_check
-quit:
-        mov r31.b0, PRU0_ARM_INTERRUPT + 16
-        halt
+//quit:
+//        mov r31.b0, PRU0_ARM_INTERRUPT + 16
+//        halt
 
         // run MAX6921 chip at ~5mhz
 write_digit:
