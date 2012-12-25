@@ -37,6 +37,7 @@
 //      - b1 -> second digit 2
 // r27 - return pointer
 // r28 - routine argument
+// r30 - GPO PRU0
 // r31 - HOST-to-PRU INTC
 
 #define REG_HOUR_COUNTER_1        r25.b0
