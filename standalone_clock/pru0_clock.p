@@ -106,31 +106,32 @@
 .origin 0
 .entrypoint start
 
-.macro PULSE
-        mov     GPO_PRU0_REG, r28
+.macro NOP
+        mov     r0, r0
 .endm
 
 // 10 clock cycle delay
-.macro EN_PULSE
-        PULSE
-        PULSE
-        PULSE
-        PULSE
-        PULSE
-        PULSE
-        PULSE
-        PULSE
-        PULSE
-        PULSE
-        PULSE
+.macro EN_DELAY
+        NOP
+        NOP
+        NOP
+        NOP
+        NOP
+        NOP
+        NOP
+        NOP
+        NOP
+        NOP
+        NOP
 .endm
 
-// EN_PULSE + 3 clock cycle delay
+// EN_DELAY + 4 clock cycle delay
 .macro WRITE_DATA
 .mparam update_count
+        mov GPO_PRU0_REG, r28
         mov r0, update_count
 update_begin:
-        EN_PULSE
+        EN_DELAY
 
         sub r0, r0, 1
         qbne update_begin, r0, 0
