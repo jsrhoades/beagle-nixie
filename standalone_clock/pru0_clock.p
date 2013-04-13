@@ -73,13 +73,13 @@
 #define TIME_DATA_1    r25
 #define TIME_DATA_2    r26
 
-#define SEG_A   1<< 0x0a
-#define SEG_B   1<< 0x01
-#define SEG_C   1<< 0x07
-#define SEG_D   1<< 0x08
-#define SEG_E   1<< 0x06
-#define SEG_F   1<< 0x00
-#define SEG_G   1<< 0x02
+#define SEG_A   1<< 0x13
+#define SEG_B   1<< 0x11
+#define SEG_C   1<< 0x0e
+#define SEG_D   1<< 0x0d
+#define SEG_E   1<< 0x0f
+#define SEG_F   1<< 0x12
+#define SEG_G   1<< 0x10
 
 #define VFD_SEGMENT_0      r15
 #define VFD_SEGMENT_1      r16
@@ -149,14 +149,14 @@ start:
         sbco r0, CONST_PRUCFG, 4, 4
 
         // load digit indexes and digit segment values
-        mov VFD_HOUR_1,   1<< 0x10
-        mov VFD_HOUR_2,   1<< 0x11 | 1<< 0x09 // period
+        mov VFD_HOUR_1,   1<< 0x08
+        mov VFD_HOUR_2,   1<< 0x09 | 1<< 0x0b // period
 
-        mov VFD_MINUTE_1, 1<< 0x0e
-        mov VFD_MINUTE_2, 1<< 0x12 | 1<< 0x09 // period
+        mov VFD_MINUTE_1, 1<< 0x06
+        mov VFD_MINUTE_2, 1<< 0x0a | 1<< 0x0b // period
 
-        mov VFD_SECOND_1, 1<< 0x0d
-        mov VFD_SECOND_2, 1<< 0x13
+        mov VFD_SECOND_1, 1<< 0x05
+        mov VFD_SECOND_2, 1<< 0x0c
         
         // 0
         mov VFD_SEGMENT_0, SEG_A | SEG_B | SEG_C | SEG_D | SEG_E | SEG_F
