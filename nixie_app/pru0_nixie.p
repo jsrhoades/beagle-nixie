@@ -19,8 +19,8 @@
 #define PRU0_ARM_INTERRUPT      19
 #define ARM_PRU0_INTERRUPT      21
 
-#define DATA_BIT           1<<0
-#define CLOCK_BIT          1<<5
+#define DATA_BIT           1<<5
+#define CLOCK_BIT          1<<0
 #define LATCH_BIT          1<<1
 
 #define CONST_PRUCFG       c4

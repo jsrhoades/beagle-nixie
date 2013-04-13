@@ -52,8 +52,8 @@
 #define PRU1_PRU0_INTERRUPT     18
 #define PRU0_ARM_INTERRUPT      19
 
-#define DATA_BIT      1<<0
-#define CLOCK_BIT     1<<5
+#define DATA_BIT      1<<5
+#define CLOCK_BIT     1<<0
 #define LATCH_BIT     1<<1
 
 #define VFD_DIGIT_2   r2
