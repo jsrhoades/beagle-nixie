@@ -52,9 +52,9 @@
 #define PRU1_PRU0_INTERRUPT     18
 #define PRU0_ARM_INTERRUPT      19
 
-#define DATA_BIT      1<<5
-#define CLOCK_BIT     1<<0
-#define LATCH_BIT     1<<1
+#define DATA_SHIFT      5
+#define CLOCK_SHIFT     0
+#define LATCH_SHIFT     1
 
 #define VFD_DIGIT_2   r2
 #define VFD_DIGIT_3   r3
@@ -273,7 +273,8 @@ write_digit:
 data:
         // check to see right most bit state
         and r28, r1, 1
-        or r28, r28, CLOCK_BIT
+        lsl r28, r28, DATA_SHIFT
+        or  r28, r28, 1<<CLOCK_SHIFT
         WRITE_DATA 10
         
         // clock
@@ -286,7 +287,7 @@ data:
 
 latch:
         // latch
-        mov r28, LATCH_BIT
+        mov r28, 1<<LATCH_SHIFT
         WRITE_DATA 10
         ret
 

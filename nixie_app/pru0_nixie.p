@@ -19,9 +19,9 @@
 #define PRU0_ARM_INTERRUPT      19
 #define ARM_PRU0_INTERRUPT      21
 
-#define DATA_BIT           1<<5
-#define CLOCK_BIT          1<<0
-#define LATCH_BIT          1<<1
+#define DATA_SHFIT      5
+#define CLOCK_SHIFT     1
+#define LATCH_SHIFT     1
 
 #define CONST_PRUCFG       c4
 #define CONST_PRUSRAM      c24
@@ -164,7 +164,8 @@ write_digit:
 data:
         // check to see right most bit state
         and r13, r1, 1
-        or r13, r13, CLOCK_BIT
+        lsl r13, r13, DATA_SHIFT
+        or r13, r13, 1<<CLOCK_SHIFT
         WRITE_DATA 10
         
         // clock
@@ -176,6 +177,6 @@ data:
         qbne data, r12, 0
 latch:
         // latch
-        mov r13, LATCH_BIT
+        mov r13, 1<<LATCH_SHIFT
         WRITE_DATA 10
         ret
