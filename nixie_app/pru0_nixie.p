@@ -19,7 +19,7 @@
 #define PRU0_ARM_INTERRUPT      19
 #define ARM_PRU0_INTERRUPT      21
 
-#define DATA_SHFIT      5
+#define DATA_SHIFT      5
 #define CLOCK_SHIFT     1
 #define LATCH_SHIFT     1
 
